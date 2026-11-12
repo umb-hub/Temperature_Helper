@@ -55,6 +55,10 @@ class SharedState:
         self.data.update(changes)
         await self._store.async_save(self.data)
 
+    async def async_remove(self) -> None:
+        self.data = {}
+        await self._store.async_remove()
+
 
 def average_entity_id(hass: HomeAssistant, entry_id: str | None) -> str | None:
     """Current entity id of the average helper (follows user renames)."""
@@ -73,9 +77,10 @@ async def async_add_sensor_to_average(
     )
 
     if entry is None:
-        if entry_id and not recreate:
-            _LOGGER.debug("Average helper was deleted by the user; not recreating")
-            return
+        # Called only for a sensor this zone never placed (or on "recreate"):
+        # a zone added after the helper was deleted gets a fresh one. Zones
+        # that already placed their sensor do not call this, so a deletion
+        # is still respected across restarts.
         result = await hass.config_entries.flow.async_init(
             MIN_MAX, context={"source": SOURCE_USER}
         )
@@ -91,7 +96,10 @@ async def async_add_sensor_to_average(
         if result["type"] is not FlowResultType.CREATE_ENTRY:
             _LOGGER.warning("Unable to create average helper: %s", result)
             return
-        await shared.async_set(average_entry_id=result["result"].entry_id)
+        # New helper -> its graph must be placed again
+        await shared.async_set(
+            average_entry_id=result["result"].entry_id, graph_placed=False
+        )
         _LOGGER.info("Created average helper '%s'", AVERAGE_NAME)
         return
 

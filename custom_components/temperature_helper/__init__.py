@@ -19,6 +19,7 @@ from .const import (
     CONF_STEP,
     CONF_TEMP_SENSOR,
     CONF_ZONE,
+    DOMAIN,
     DATA_DASHBOARD_PLACED,
     DATA_HELPERS,
     INPUT_BOOLEAN,
@@ -231,6 +232,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Integration removed: helpers are intentionally NOT deleted."""
+    others = [
+        e for e in hass.config_entries.async_entries(DOMAIN) if e.entry_id != entry.entry_id
+    ]
+    if not others:
+        # Last zone gone: forget shared state so a fresh install starts clean.
+        async with shared_lock(hass):
+            await SharedState(hass).async_remove()
     _LOGGER.info(
         "Temperature Helper entry '%s' removed; its helpers are kept: %s",
         entry.title,

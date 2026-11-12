@@ -229,15 +229,47 @@ async def test_average_helper_and_graph(hass: HomeAssistant) -> None:
     assert config["views"][0]["sections"][0]["cards"][0]["type"] == "statistics-graph"
 
 
-async def test_average_helper_deleted_not_recreated(hass: HomeAssistant) -> None:
+async def test_average_helper_deleted_respected_for_existing_zone(hass: HomeAssistant) -> None:
     entry = await _setup_with_lovelace_sensor(hass, "Soggiorno", "sensor.t_soggiorno")
     avg = hass.config_entries.async_entries("min_max")[0]
     assert await hass.config_entries.async_remove(avg.entry_id)
     await hass.async_block_till_done()
-    await _add_zone(hass, "Camera", "sensor.t_camera")
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
     assert hass.config_entries.async_entries("min_max") == []
+
+
+async def test_average_helper_recreated_by_new_zone(hass: HomeAssistant) -> None:
+    await _setup_with_lovelace_sensor(hass, "Soggiorno", "sensor.t_soggiorno")
+    avg = hass.config_entries.async_entries("min_max")[0]
+    assert await hass.config_entries.async_remove(avg.entry_id)
+    await hass.async_block_till_done()
+    await _add_zone(hass, "Camera", "sensor.t_camera")
+    entries = hass.config_entries.async_entries("min_max")
+    assert len(entries) == 1
+    assert entries[0].options["entity_ids"] == ["sensor.t_camera"]
+    config = await _dashboard(hass).async_load(False)
+    assert any(
+        g["entities"] == [er_entity(hass, entries[0].entry_id)] for g in _graphs(config)
+    )
+
+
+async def test_cleanup_then_readd_zone_recreates_average(hass: HomeAssistant) -> None:
+    """Remove everything (zone, helpers, dashboard) and add the zone again."""
+    entry = await _setup_with_lovelace_sensor(hass, "Soggiorno", "sensor.t_soggiorno")
+    assert await hass.config_entries.async_remove(entry.entry_id)
+    for avg in hass.config_entries.async_entries("min_max"):
+        assert await hass.config_entries.async_remove(avg.entry_id)
+    await hass.async_block_till_done()
+
+    await _add_zone(hass, "Soggiorno", "sensor.t_soggiorno")
+    assert len(hass.config_entries.async_entries("min_max")) == 1
+
+
+def er_entity(hass, entry_id):
+    from homeassistant.helpers import entity_registry as er
+
+    return er.async_get(hass).async_get_entity_id("sensor", "min_max", entry_id)
 
 
 async def test_concurrent_setup_single_average(hass: HomeAssistant) -> None:
