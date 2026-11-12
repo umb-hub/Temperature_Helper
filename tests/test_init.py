@@ -344,11 +344,11 @@ async def test_template_helper_created_and_in_graph(hass: HomeAssistant) -> None
     tpl = hass.config_entries.async_entries("template")
     assert len(tpl) == 1
     assert tpl[0].title == TEMPLATE_NAME
-    assert tpl[0].options["state"].startswith("{{0.00000001*as_timestamp(")
+    assert "now()" in tpl[0].options["state"]
     assert tpl[0].options["unit_of_measurement"] == "kWh"
     assert tpl[0].options["state_class"] == "measurement"
     tpl_entity = f"sensor.{slugify(TEMPLATE_NAME)}"
-    assert hass.states.get(tpl_entity) is not None
+    assert float(hass.states.get(tpl_entity).state) > 17  # ~ 17.6 in 2026
 
     # no duplicates on reload / second zone
     assert await hass.config_entries.async_reload(entry.entry_id)

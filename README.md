@@ -37,10 +37,8 @@ barra laterale) con una sezione per zona: titolo della zona + una tile per ogni 
   quell'helper: la legenda usa il suo nome, quindi rinominandolo cambia anche il grafico.
 - **Helper template "test"**: creato sempre (anche senza sensori), una sola volta per
   installazione. È un *Template → Sensore template* nativo con stato
-  `{{0.00000001*as_timestamp(states('sensor.date_time_iso'))}}`, unità `kWh`,
-  classe di stato *Misura*. Compare anch'esso nel grafico statistico. Richiede
-  l'integrazione *Data e ora* con il sensore `sensor.date_time_iso`, altrimenti
-  resta *non disponibile*.
+  `{{ (0.00000001 * now().timestamp()) | round(6) }}` (si aggiorna ogni minuto, nessuna
+  dipendenza), unità `kWh`, classe di stato *Misura*. Compare nel grafico statistico.
 - L'helper resta anche rimuovendo l'integrazione; se lo elimini non viene ricreato
   (salvo l'opzione *Ricrea*).
 - È una normale dashboard: la modifichi da *Modifica dashboard* come vuoi.
