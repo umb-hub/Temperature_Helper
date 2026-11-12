@@ -11,7 +11,11 @@
           "max_temp": "Maximum temperature",
           "step": "Step",
           "manual_switch": "Create 'Manual mode' switch (input_boolean)",
-          "dashboard": "Add helpers to the 'Temperature' dashboard"
+          "dashboard": "Add helpers to the 'Temperature' dashboard",
+          "temperature_sensor": "Zone temperature sensor (optional)"
+        },
+        "data_description": {
+          "temperature_sensor": "Added to the dashboard statistics graph"
         }
       }
     },
@@ -36,7 +40,11 @@
           "step": "Step",
           "manual_switch": "Create 'Manual mode' switch (input_boolean)",
           "recreate_missing": "Recreate helpers and dashboard cards I deleted",
-          "dashboard": "Add helpers to the 'Temperature' dashboard"
+          "dashboard": "Add helpers to the 'Temperature' dashboard",
+          "temperature_sensor": "Zone temperature sensor (optional)"
+        },
+        "data_description": {
+          "temperature_sensor": "Added to the dashboard statistics graph"
         }
       }
     },

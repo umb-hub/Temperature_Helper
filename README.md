@@ -29,6 +29,10 @@ l'integrazione crea una dashboard nativa **Temperature** (`/temperature-helper`,
 barra laterale) con una sezione per zona: titolo della zona + una tile per ogni helper
 (pulsanti −/+ per i setpoint, tocco per la modalità manuale).
 
+- In cima c'è un unico grafico statistico **Andamento temperature** (media/min/max
+  orari, ultimi 7 giorni) con i sensori di temperatura di tutte le zone. Il sensore
+  di ogni zona è facoltativo e si sceglie in configurazione o nelle opzioni; il
+  grafico compare alla prima zona che ne ha uno.
 - È una normale dashboard: la modifichi da *Modifica dashboard* come vuoi.
 - Ogni helper viene aggiunto **una sola volta**: se togli una card o l'intera
   dashboard, non riappare al riavvio. Usa *Ricrea helper e card della dashboard

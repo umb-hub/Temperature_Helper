@@ -193,3 +193,55 @@ async def test_dashboard_disabled(hass: HomeAssistant) -> None:
     )
     await hass.async_block_till_done()
     assert _dashboard(hass) is None
+
+
+async def test_statistics_graph_single_card(hass: HomeAssistant) -> None:
+    from custom_components.temperature_helper.const import GRAPH_NAME
+
+    entry = await _setup_with_lovelace_sensor(hass, "Soggiorno", "sensor.t_soggiorno")
+    await _add_zone(hass, "Camera", "sensor.t_camera")
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    config = await _dashboard(hass).async_load(False)
+    graphs = [
+        c
+        for s in config["views"][0]["sections"]
+        for c in s["cards"]
+        if c["type"] == "statistics-graph"
+    ]
+    assert len(graphs) == 1
+    assert graphs[0]["title"] == GRAPH_NAME
+    assert graphs[0]["entities"] == ["sensor.t_soggiorno", "sensor.t_camera"]
+    # graph section is first
+    assert config["views"][0]["sections"][0]["cards"][0]["type"] == "statistics-graph"
+
+
+async def test_no_sensor_no_graph(hass: HomeAssistant) -> None:
+    await _setup_with_lovelace(hass)
+    config = await _dashboard(hass).async_load(False)
+    assert not any(
+        c["type"] == "statistics-graph"
+        for s in config["views"][0]["sections"]
+        for c in s["cards"]
+    )
+
+
+async def _add_zone(hass, zone, sensor):
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**USER_INPUT, "zone": zone, "temperature_sensor": sensor}
+    )
+    await hass.async_block_till_done()
+    return result["result"]
+
+
+async def _setup_with_lovelace_sensor(hass, zone, sensor):
+    assert await async_setup_component(hass, "lovelace", {})
+    assert await async_setup_component(hass, "input_number", {})
+    assert await async_setup_component(hass, "input_boolean", {})
+    hass.states.async_set("sensor.t_soggiorno", "20", {"device_class": "temperature"})
+    hass.states.async_set("sensor.t_camera", "19", {"device_class": "temperature"})
+    return await _add_zone(hass, zone, sensor)

@@ -27,6 +27,7 @@ from .const import (
     CONF_RECREATE_MISSING,
     CONF_SETPOINTS,
     CONF_STEP,
+    CONF_TEMP_SENSOR,
     CONF_ZONE,
     DATA_HELPERS,
     DEFAULT_MAX_TEMP,
@@ -79,6 +80,19 @@ def _settings_schema(defaults: dict[str, Any]) -> dict:
         vol.Required(
             CONF_DASHBOARD, default=defaults.get(CONF_DASHBOARD, True)
         ): selector.BooleanSelector(),
+        **_sensor_field(defaults.get(CONF_TEMP_SENSOR)),
+    }
+
+
+def _sensor_field(current: str | None) -> dict:
+    """Optional temperature sensor; suggested_value keeps it clearable."""
+    return {
+        vol.Optional(
+            CONF_TEMP_SENSOR,
+            description={"suggested_value": current} if current else None,
+        ): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
+        )
     }
 
 
@@ -140,7 +154,10 @@ class TemperatureHelperOptionsFlow(OptionsFlow):
         if user_input is not None:
             errors = _validate(user_input)
             if not errors:
-                return self.async_create_entry(data=user_input)
+                # Explicit "" so a cleared sensor overrides the one in entry.data
+                return self.async_create_entry(
+                    data={CONF_TEMP_SENSOR: "", **user_input}
+                )
 
         current = {**self.config_entry.data, **self.config_entry.options}
         schema = {

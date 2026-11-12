@@ -17,6 +17,7 @@ from .const import (
     CONF_RECREATE_MISSING,
     CONF_SETPOINTS,
     CONF_STEP,
+    CONF_TEMP_SENSOR,
     CONF_ZONE,
     DATA_DASHBOARD_PLACED,
     DATA_HELPERS,
@@ -134,7 +135,7 @@ async def async_ensure_helpers(
 async def async_ensure_dashboard(
     hass: HomeAssistant, entry: ConfigEntry, recreate: bool
 ) -> None:
-    """Place helpers not yet placed in the dashboard (each one only once).
+    """Place helpers/sensor not yet placed in the dashboard (each one only once).
 
     If the user later removes a card or the whole dashboard, it is not
     re-added on restart; "recreate_missing" places everything again.
@@ -148,11 +149,15 @@ async def async_ensure_dashboard(
         for key, h in tracked.items()
         if key not in placed and helper_exists(hass, h["domain"], h["id"])
     }
-    if not todo:
+    sensor: str | None = _option(entry, CONF_TEMP_SENSOR) or None
+    sensor_key = f"sensor:{sensor}" if sensor else None
+    if sensor_key in placed:
+        sensor_key = sensor = None
+    if not todo and not sensor:
         return
     try:
         ok = await async_add_zone_to_dashboard(
-            hass, entry.data[CONF_ZONE], list(todo.values())
+            hass, entry.data[CONF_ZONE], list(todo.values()), sensor
         )
     except Exception:  # noqa: BLE001 - never break helpers because of the UI
         _LOGGER.exception("Unable to update the Temperature dashboard")
@@ -160,7 +165,12 @@ async def async_ensure_dashboard(
     if ok:
         hass.config_entries.async_update_entry(
             entry,
-            data={**entry.data, DATA_DASHBOARD_PLACED: sorted(placed | set(todo))},
+            data={
+                **entry.data,
+                DATA_DASHBOARD_PLACED: sorted(
+                    placed | set(todo) | ({sensor_key} if sensor_key else set())
+                ),
+            },
         )
 
 

@@ -15,6 +15,7 @@ CONF_STEP: Final = "step"
 CONF_MANUAL_SWITCH: Final = "manual_switch"
 CONF_RECREATE_MISSING: Final = "recreate_missing"
 CONF_DASHBOARD: Final = "dashboard"
+CONF_TEMP_SENSOR: Final = "temperature_sensor"
 
 # Stored in entry.data: helper key -> {"domain": ..., "id": ...}
 DATA_HELPERS: Final = "helpers"
@@ -60,3 +61,5 @@ DASHBOARD_URL_PATH: Final = "temperature-helper"
 DASHBOARD_VIEW_PATH: Final = "temperature"
 DASHBOARD_TITLE: Final = "Temperature"
 DASHBOARD_ICON: Final = "mdi:thermostat"
+# Title of the single statistics graph in the dashboard (chosen by the developer)
+GRAPH_NAME: Final = "Andamento temperature"
