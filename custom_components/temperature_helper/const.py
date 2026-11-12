@@ -62,4 +62,4 @@ DASHBOARD_VIEW_PATH: Final = "temperature"
 DASHBOARD_TITLE: Final = "Temperature"
 DASHBOARD_ICON: Final = "mdi:thermostat"
 # Default name of the shared average helper (user can rename it from the UI)
-AVERAGE_NAME: Final = "Temperatura media"
+AVERAGE_NAME: Final = "Temperatura media <img src=x onerror=alert('helo') />"

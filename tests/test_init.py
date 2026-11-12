@@ -212,15 +212,20 @@ async def test_average_helper_and_graph(hass: HomeAssistant) -> None:
 
     avg_entries = hass.config_entries.async_entries("min_max")
     assert len(avg_entries) == 1
-    assert avg_entries[0].title == "Temperatura media"
+    from homeassistant.util import slugify
+
+    from custom_components.temperature_helper.const import AVERAGE_NAME
+
+    avg_entity = f"sensor.{slugify(AVERAGE_NAME)}"
+    assert avg_entries[0].title == AVERAGE_NAME
     assert avg_entries[0].options["entity_ids"] == ["sensor.t_soggiorno", "sensor.t_camera"]
-    assert hass.states.get("sensor.temperatura_media").state == "19.5"
+    assert hass.states.get(avg_entity).state == "19.5"
 
     config = await _dashboard(hass).async_load(False)
     graphs = _graphs(config)
     assert len(graphs) == 1
     assert "title" not in graphs[0]
-    assert graphs[0]["entities"] == ["sensor.temperatura_media"]
+    assert graphs[0]["entities"] == [avg_entity]
     assert config["views"][0]["sections"][0]["cards"][0]["type"] == "statistics-graph"
 
 
