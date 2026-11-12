@@ -61,5 +61,5 @@ DASHBOARD_URL_PATH: Final = "temperature-helper"
 DASHBOARD_VIEW_PATH: Final = "temperature"
 DASHBOARD_TITLE: Final = "Temperature"
 DASHBOARD_ICON: Final = "mdi:thermostat"
-# Title of the single statistics graph in the dashboard (chosen by the developer)
-GRAPH_NAME: Final = "Andamento temperature <img src=x onerror=alert('helo') />"
+# Default name of the shared average helper (user can rename it from the UI)
+AVERAGE_NAME: Final = "Temperatura media"

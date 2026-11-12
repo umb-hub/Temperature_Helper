@@ -28,6 +28,12 @@ from .const import (
     MANUAL_SWITCH_LABEL,
     SETPOINT_TYPES,
 )
+from .average_manager import (
+    SharedState,
+    async_add_sensor_to_average,
+    average_entity_id,
+    shared_lock,
+)
 from .dashboard_manager import async_add_zone_to_dashboard
 from .helper_manager import (
     HelperCollectionUnavailable,
@@ -132,46 +138,64 @@ async def async_ensure_helpers(
 
 
 
-async def async_ensure_dashboard(
+async def async_ensure_shared(
     hass: HomeAssistant, entry: ConfigEntry, recreate: bool
 ) -> None:
-    """Place helpers/sensor not yet placed in the dashboard (each one only once).
+    """Average helper, dashboard tiles and statistics graph.
 
-    If the user later removes a card or the whole dashboard, it is not
+    Each item is placed only once: if the user later removes a card, a sensor
+    from the average helper, the helper or the whole dashboard, it is not
     re-added on restart; "recreate_missing" places everything again.
+    Serialised by a lock because zones are set up concurrently at boot.
     """
-    if not _option(entry, CONF_DASHBOARD, True):
-        return
-    tracked: dict[str, dict[str, str]] = entry.data.get(DATA_HELPERS, {})
-    placed = set() if recreate else set(entry.data.get(DATA_DASHBOARD_PLACED, []))
-    todo = {
-        key: h
-        for key, h in tracked.items()
-        if key not in placed and helper_exists(hass, h["domain"], h["id"])
-    }
-    sensor: str | None = _option(entry, CONF_TEMP_SENSOR) or None
-    sensor_key = f"sensor:{sensor}" if sensor else None
-    if sensor_key in placed:
-        sensor_key = sensor = None
-    if not todo and not sensor:
-        return
-    try:
-        ok = await async_add_zone_to_dashboard(
-            hass, entry.data[CONF_ZONE], list(todo.values()), sensor
-        )
-    except Exception:  # noqa: BLE001 - never break helpers because of the UI
-        _LOGGER.exception("Unable to update the Temperature dashboard")
-        return
-    if ok:
-        hass.config_entries.async_update_entry(
-            entry,
-            data={
-                **entry.data,
-                DATA_DASHBOARD_PLACED: sorted(
-                    placed | set(todo) | ({sensor_key} if sensor_key else set())
-                ),
-            },
-        )
+    async with shared_lock(hass):
+        shared = await SharedState(hass).async_load()
+        placed = set() if recreate else set(entry.data.get(DATA_DASHBOARD_PLACED, []))
+        new_placed: set[str] = set()
+
+        # 1) zone temperature sensor -> average helper (independent of dashboard)
+        sensor: str | None = _option(entry, CONF_TEMP_SENSOR) or None
+        if sensor and f"avg:{sensor}" not in placed:
+            try:
+                await async_add_sensor_to_average(hass, shared, sensor, recreate)
+                new_placed.add(f"avg:{sensor}")
+            except Exception:  # noqa: BLE001 - never break the zone because of it
+                _LOGGER.exception("Unable to update the average temperature helper")
+
+        # 2) dashboard
+        if _option(entry, CONF_DASHBOARD, True):
+            tracked: dict[str, dict[str, str]] = entry.data.get(DATA_HELPERS, {})
+            todo = {
+                key: h
+                for key, h in tracked.items()
+                if key not in placed and helper_exists(hass, h["domain"], h["id"])
+            }
+            graph_entity = None
+            if recreate or not shared.data.get("graph_placed"):
+                graph_entity = average_entity_id(
+                    hass, shared.data.get("average_entry_id")
+                )
+            if todo or graph_entity:
+                try:
+                    ok = await async_add_zone_to_dashboard(
+                        hass, entry.data[CONF_ZONE], list(todo.values()), graph_entity
+                    )
+                except Exception:  # noqa: BLE001 - never break helpers because of the UI
+                    _LOGGER.exception("Unable to update the Temperature dashboard")
+                    ok = False
+                if ok:
+                    new_placed |= set(todo)
+                    if graph_entity:
+                        await shared.async_set(graph_placed=True)
+
+        if new_placed:
+            hass.config_entries.async_update_entry(
+                entry,
+                data={
+                    **entry.data,
+                    DATA_DASHBOARD_PLACED: sorted(placed | new_placed),
+                },
+            )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -182,7 +206,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except HelperCollectionUnavailable as err:
         raise ConfigEntryNotReady(str(err)) from err
 
-    await async_ensure_dashboard(hass, entry, recreate)
+    await async_ensure_shared(hass, entry, recreate)
 
     if recreate:
         # One-shot flag: clear it so later restarts respect user deletions again.

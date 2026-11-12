@@ -15,7 +15,7 @@
           "temperature_sensor": "Sensore temperatura della zona (facoltativo)"
         },
         "data_description": {
-          "temperature_sensor": "Aggiunto al grafico statistico della dashboard"
+          "temperature_sensor": "Aggiunto all'helper condiviso 'Temperatura media', mostrato nel grafico della dashboard"
         }
       }
     },
@@ -44,7 +44,7 @@
           "temperature_sensor": "Sensore temperatura della zona (facoltativo)"
         },
         "data_description": {
-          "temperature_sensor": "Aggiunto al grafico statistico della dashboard"
+          "temperature_sensor": "Aggiunto all'helper condiviso 'Temperatura media', mostrato nel grafico della dashboard"
         }
       }
     },

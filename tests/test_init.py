@@ -195,26 +195,71 @@ async def test_dashboard_disabled(hass: HomeAssistant) -> None:
     assert _dashboard(hass) is None
 
 
-async def test_statistics_graph_single_card(hass: HomeAssistant) -> None:
-    from custom_components.temperature_helper.const import GRAPH_NAME
-
-    entry = await _setup_with_lovelace_sensor(hass, "Soggiorno", "sensor.t_soggiorno")
-    await _add_zone(hass, "Camera", "sensor.t_camera")
-    assert await hass.config_entries.async_reload(entry.entry_id)
-    await hass.async_block_till_done()
-
-    config = await _dashboard(hass).async_load(False)
-    graphs = [
+def _graphs(config):
+    return [
         c
         for s in config["views"][0]["sections"]
         for c in s["cards"]
         if c["type"] == "statistics-graph"
     ]
+
+
+async def test_average_helper_and_graph(hass: HomeAssistant) -> None:
+    entry = await _setup_with_lovelace_sensor(hass, "Soggiorno", "sensor.t_soggiorno")
+    await _add_zone(hass, "Camera", "sensor.t_camera")
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    avg_entries = hass.config_entries.async_entries("min_max")
+    assert len(avg_entries) == 1
+    assert avg_entries[0].title == "Temperatura media"
+    assert avg_entries[0].options["entity_ids"] == ["sensor.t_soggiorno", "sensor.t_camera"]
+    assert hass.states.get("sensor.temperatura_media").state == "19.5"
+
+    config = await _dashboard(hass).async_load(False)
+    graphs = _graphs(config)
     assert len(graphs) == 1
-    assert graphs[0]["title"] == GRAPH_NAME
-    assert graphs[0]["entities"] == ["sensor.t_soggiorno", "sensor.t_camera"]
-    # graph section is first
+    assert "title" not in graphs[0]
+    assert graphs[0]["entities"] == ["sensor.temperatura_media"]
     assert config["views"][0]["sections"][0]["cards"][0]["type"] == "statistics-graph"
+
+
+async def test_average_helper_deleted_not_recreated(hass: HomeAssistant) -> None:
+    entry = await _setup_with_lovelace_sensor(hass, "Soggiorno", "sensor.t_soggiorno")
+    avg = hass.config_entries.async_entries("min_max")[0]
+    assert await hass.config_entries.async_remove(avg.entry_id)
+    await hass.async_block_till_done()
+    await _add_zone(hass, "Camera", "sensor.t_camera")
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.config_entries.async_entries("min_max") == []
+
+
+async def test_concurrent_setup_single_average(hass: HomeAssistant) -> None:
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    assert await async_setup_component(hass, "lovelace", {})
+    hass.states.async_set("sensor.t_soggiorno", "20", {"device_class": "temperature"})
+    hass.states.async_set("sensor.t_camera", "19", {"device_class": "temperature"})
+    entries = []
+    for zone, sensor in (("Soggiorno", "sensor.t_soggiorno"), ("Camera", "sensor.t_camera")):
+        e = MockConfigEntry(
+            domain=DOMAIN,
+            title=zone,
+            unique_id=zone.lower(),
+            data={**USER_INPUT, "zone": zone, "temperature_sensor": sensor, "dashboard": True, "helpers": {}},
+        )
+        e.add_to_hass(hass)
+        entries.append(e)
+    assert await async_setup_component(hass, DOMAIN, {})
+    await hass.async_block_till_done()
+    assert len(hass.config_entries.async_entries("min_max")) == 1
+    config = await _dashboard(hass).async_load(False)
+    assert len(_graphs(config)) == 1
+    headings = sorted(
+        s["cards"][0]["heading"] for s in config["views"][0]["sections"][1:]
+    )
+    assert headings == ["Camera", "Soggiorno"]
 
 
 async def test_no_sensor_no_graph(hass: HomeAssistant) -> None:

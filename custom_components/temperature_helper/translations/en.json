@@ -15,7 +15,7 @@
           "temperature_sensor": "Zone temperature sensor (optional)"
         },
         "data_description": {
-          "temperature_sensor": "Added to the dashboard statistics graph"
+          "temperature_sensor": "Added to the shared 'Temperatura media' helper shown in the dashboard graph"
         }
       }
     },
@@ -44,7 +44,7 @@
           "temperature_sensor": "Zone temperature sensor (optional)"
         },
         "data_description": {
-          "temperature_sensor": "Added to the dashboard statistics graph"
+          "temperature_sensor": "Added to the shared 'Temperatura media' helper shown in the dashboard graph"
         }
       }
     },

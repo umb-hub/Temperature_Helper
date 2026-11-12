@@ -17,7 +17,6 @@ from homeassistant.helpers import entity_registry as er
 
 from .const import (
     DASHBOARD_ICON,
-    GRAPH_NAME,
     DASHBOARD_TITLE,
     DASHBOARD_URL_PATH,
     DASHBOARD_VIEW_PATH,
@@ -138,28 +137,21 @@ def _place_helpers(views: list[dict[str, Any]], zone: str, entity_ids: list[str]
     views[_view_index(views)]["sections"].append(_zone_section(zone, entity_ids))
 
 
-def _graph_entities(card: dict[str, Any]) -> list[str]:
-    return [
-        e if isinstance(e, str) else e.get("entity", "")
-        for e in card.get("entities", [])
-    ]
-
-
-def _place_sensor(views: list[dict[str, Any]], sensor: str, graph_name: str) -> bool:
-    """Add the sensor to the single statistics graph (created on first use)."""
+def _place_graph(views: list[dict[str, Any]], entity_id: str) -> bool:
+    """Add a statistics graph (no title) of ``entity_id`` at the top, once."""
     for view in views:
         for section in view.get("sections") or []:
             for card in section.get("cards", []):
-                if isinstance(card, dict) and card.get("type") == "statistics-graph":
-                    if sensor in _graph_entities(card):
-                        return False
-                    card.setdefault("entities", []).append(sensor)
-                    return True
+                if (
+                    isinstance(card, dict)
+                    and card.get("type") == "statistics-graph"
+                    and entity_id in _referenced_entities(card)
+                ):
+                    return False
 
     graph = {
         "type": "statistics-graph",
-        "title": graph_name,
-        "entities": [sensor],
+        "entities": [entity_id],
         "chart_type": "line",
         "period": "hour",
         "days_to_show": 7,
@@ -176,15 +168,15 @@ async def async_add_zone_to_dashboard(
     hass: HomeAssistant,
     zone: str,
     helpers: list[dict[str, str]],
-    sensor: str | None = None,
+    graph_entity: str | None = None,
 ) -> bool:
-    """Ensure the dashboard exists and shows this zone's helpers and sensor.
+    """Ensure the dashboard exists and shows this zone's helpers (+ graph).
 
     Returns True when done (or nothing to do), False if Lovelace is unavailable.
     Never modifies or removes what the user has: helpers already referenced
     anywhere are skipped, the others are appended to the zone's section
-    (matched by its heading) or to a new section. The sensor is appended to the
-    single statistics graph of the dashboard, created at the top if missing.
+    (matched by its heading) or to a new section. ``graph_entity`` gets a
+    statistics graph without title at the top (legend = helper's name).
     """
     dashboards = _dashboards(hass)
     if dashboards is None:
@@ -234,7 +226,7 @@ async def async_add_zone_to_dashboard(
         _place_helpers(views, zone, missing)
         changed = True
 
-    if sensor and _place_sensor(views, sensor, GRAPH_NAME):
+    if graph_entity and _place_graph(views, graph_entity):
         changed = True
 
     if changed:
