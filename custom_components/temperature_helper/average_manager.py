@@ -171,3 +171,39 @@ async def async_add_sensor_to_average(
         },
     )
     _LOGGER.info("Added %s to average helper", sensor)
+
+
+async def async_remove_sensor_from_average(
+    hass: HomeAssistant, shared: SharedState, sensor: str
+) -> None:
+    """Take ``sensor`` out of the average helper; delete the helper if empty."""
+    entry_id = shared.data.get("average_entry_id")
+    entry = hass.config_entries.async_get_entry(entry_id) if entry_id else None
+    if entry is None:
+        return
+    entity_ids = [e for e in entry.options.get("entity_ids", []) if e != sensor]
+    if entity_ids == list(entry.options.get("entity_ids", [])):
+        return
+    if not entity_ids:
+        await hass.config_entries.async_remove(entry.entry_id)
+        await shared.async_set(average_entry_id=None, graph_placed=False)
+        _LOGGER.info("Deleted average helper (no sensors left)")
+        return
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            "entity_ids": entity_ids,
+            "type": entry.options.get("type", "mean"),
+            "round_digits": entry.options.get("round_digits", 1),
+        },
+    )
+
+
+async def async_remove_shared_helpers(hass: HomeAssistant, shared: SharedState) -> None:
+    """Delete the average and template helpers created by this integration."""
+    for key in ("average_entry_id", "template_entry_id"):
+        entry_id = shared.data.get(key)
+        if entry_id and hass.config_entries.async_get_entry(entry_id):
+            await hass.config_entries.async_remove(entry_id)
+            _LOGGER.info("Deleted helper config entry %s", entry_id)

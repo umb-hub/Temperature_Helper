@@ -13,7 +13,9 @@ from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
+    ConfigSubentryFlow,
     OptionsFlow,
+    SubentryFlowResult,
 )
 from homeassistant.core import callback
 from homeassistant.helpers import selector
@@ -29,13 +31,14 @@ from .const import (
     CONF_STEP,
     CONF_TEMP_SENSOR,
     CONF_ZONE,
-    DATA_HELPERS,
     DEFAULT_MAX_TEMP,
     DEFAULT_MIN_TEMP,
     DEFAULT_SETPOINTS,
     DEFAULT_STEP,
     DOMAIN,
+    ENTRY_TITLE,
     SETPOINT_TYPES,
+    SUBENTRY_ZONE,
 )
 
 TEMP_SELECTOR = selector.NumberSelector(
@@ -60,7 +63,7 @@ SETPOINT_SELECTOR = selector.SelectSelector(
 )
 
 
-def _settings_schema(defaults: dict[str, Any]) -> dict:
+def _zone_schema(defaults: dict[str, Any]) -> dict:
     return {
         vol.Required(
             CONF_SETPOINTS, default=defaults.get(CONF_SETPOINTS, DEFAULT_SETPOINTS)
@@ -77,22 +80,17 @@ def _settings_schema(defaults: dict[str, Any]) -> dict:
         vol.Required(
             CONF_MANUAL_SWITCH, default=defaults.get(CONF_MANUAL_SWITCH, True)
         ): selector.BooleanSelector(),
-        vol.Required(
-            CONF_DASHBOARD, default=defaults.get(CONF_DASHBOARD, True)
-        ): selector.BooleanSelector(),
-        **_sensor_field(defaults.get(CONF_TEMP_SENSOR)),
-    }
-
-
-def _sensor_field(current: str | None) -> dict:
-    """Optional temperature sensor; suggested_value keeps it clearable."""
-    return {
+        # suggested_value (not default) keeps the field clearable
         vol.Optional(
             CONF_TEMP_SENSOR,
-            description={"suggested_value": current} if current else None,
+            description=(
+                {"suggested_value": defaults[CONF_TEMP_SENSOR]}
+                if defaults.get(CONF_TEMP_SENSOR)
+                else None
+            ),
         ): selector.EntitySelector(
             selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
-        )
+        ),
     }
 
 
@@ -106,37 +104,23 @@ def _validate(user_input: dict[str, Any]) -> dict[str, str]:
 
 
 class TemperatureHelperConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow: one entry per zone."""
+    """Single click, no form: zones are added afterwards as subentries."""
 
-    VERSION = 1
+    VERSION = 2
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            zone = user_input[CONF_ZONE].strip()
-            if not zone:
-                errors[CONF_ZONE] = "zone_required"
-            else:
-                await self.async_set_unique_id(slugify(zone))
-                self._abort_if_unique_id_configured()
-                errors = _validate(user_input)
-                if not errors:
-                    return self.async_create_entry(
-                        title=zone,
-                        data={**user_input, CONF_ZONE: zone, DATA_HELPERS: {}},
-                    )
+        if self._async_current_entries():
+            return self.async_abort(reason="single_instance_allowed")
+        return self.async_create_entry(title=ENTRY_TITLE, data={})
 
-        schema = {
-            vol.Required(
-                CONF_ZONE, default=(user_input or {}).get(CONF_ZONE, "")
-            ): selector.TextSelector(),
-            **_settings_schema(user_input or {}),
-        }
-        return self.async_show_form(
-            step_id="user", data_schema=vol.Schema(schema), errors=errors
-        )
+    @classmethod
+    @callback
+    def async_get_supported_subentry_types(
+        cls, config_entry: ConfigEntry
+    ) -> dict[str, type[ConfigSubentryFlow]]:
+        return {SUBENTRY_ZONE: ZoneSubentryFlow}
 
     @staticmethod
     @callback
@@ -144,26 +128,76 @@ class TemperatureHelperConfigFlow(ConfigFlow, domain=DOMAIN):
         return TemperatureHelperOptionsFlow()
 
 
-class TemperatureHelperOptionsFlow(OptionsFlow):
-    """Change which helpers exist for the zone (new ones get created on save)."""
+class ZoneSubentryFlow(ConfigSubentryFlow):
+    """Add or reconfigure a heating zone."""
 
-    async def async_step_init(
+    async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    ) -> SubentryFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            zone = user_input[CONF_ZONE].strip()
+            unique_id = slugify(zone)
+            if not zone:
+                errors[CONF_ZONE] = "zone_required"
+            elif any(
+                sub.unique_id == unique_id
+                for sub in self._get_entry().subentries.values()
+            ):
+                return self.async_abort(reason="already_configured")
+            else:
+                errors = _validate(user_input)
+                if not errors:
+                    return self.async_create_entry(
+                        title=zone,
+                        data={**user_input, CONF_ZONE: zone},
+                        unique_id=unique_id,
+                    )
+
+        schema = {
+            vol.Required(
+                CONF_ZONE, default=(user_input or {}).get(CONF_ZONE, "")
+            ): selector.TextSelector(),
+            **_zone_schema(user_input or {}),
+        }
+        return self.async_show_form(
+            step_id="user", data_schema=vol.Schema(schema), errors=errors
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        subentry = self._get_reconfigure_subentry()
         errors: dict[str, str] = {}
         if user_input is not None:
             errors = _validate(user_input)
             if not errors:
-                # Explicit "" so a cleared sensor overrides the one in entry.data
-                return self.async_create_entry(
-                    data={CONF_TEMP_SENSOR: "", **user_input}
+                return self.async_update_and_abort(
+                    self._get_entry(),
+                    subentry,
+                    data={**user_input, CONF_ZONE: subentry.data[CONF_ZONE]},
                 )
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(_zone_schema(user_input or dict(subentry.data))),
+            errors=errors,
+            description_placeholders={"zone": subentry.title},
+        )
 
-        current = {**self.config_entry.data, **self.config_entry.options}
+
+class TemperatureHelperOptionsFlow(OptionsFlow):
+    """Global options: dashboard on/off, recreate what the user deleted."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
         schema = {
-            **_settings_schema(user_input or current),
+            vol.Required(
+                CONF_DASHBOARD,
+                default=self.config_entry.options.get(CONF_DASHBOARD, True),
+            ): selector.BooleanSelector(),
             vol.Required(CONF_RECREATE_MISSING, default=False): selector.BooleanSelector(),
         }
-        return self.async_show_form(
-            step_id="init", data_schema=vol.Schema(schema), errors=errors
-        )
+        return self.async_show_form(step_id="init", data_schema=vol.Schema(schema))

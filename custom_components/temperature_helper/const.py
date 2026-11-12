@@ -17,10 +17,13 @@ CONF_RECREATE_MISSING: Final = "recreate_missing"
 CONF_DASHBOARD: Final = "dashboard"
 CONF_TEMP_SENSOR: Final = "temperature_sensor"
 
-# Stored in entry.data: helper key -> {"domain": ..., "id": ...}
+# v1 (one config entry per zone) stored tracking in entry.data with these keys
 DATA_HELPERS: Final = "helpers"
-# Helper keys already placed in the dashboard (never re-added if user removes them)
 DATA_DASHBOARD_PLACED: Final = "dashboard_placed"
+
+# v2: one config entry, one subentry per zone
+SUBENTRY_ZONE: Final = "zone"
+ENTRY_TITLE: Final = "Temperature Helper"
 
 INPUT_NUMBER: Final = "input_number"
 INPUT_BOOLEAN: Final = "input_boolean"

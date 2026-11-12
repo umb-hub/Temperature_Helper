@@ -241,3 +241,79 @@ async def async_add_zone_to_dashboard(
         await dashboard.async_save(config)
         _LOGGER.info("Updated dashboard /%s for zone %s", DASHBOARD_URL_PATH, zone)
     return True
+
+
+def dashboard_exists(hass: HomeAssistant) -> bool:
+    """True if our dashboard url is registered."""
+    dashboards = _dashboards(hass)
+    return dashboards is not None and DASHBOARD_URL_PATH in dashboards
+
+
+def _strip(views: list[dict[str, Any]], zone: str | None, entity_ids: set[str]) -> bool:
+    """Remove the zone's sections and every card/graph line of ``entity_ids``."""
+    changed = False
+    for view in views:
+        sections = view.get("sections")
+        if not isinstance(sections, list):
+            continue
+        kept_sections = []
+        for section in sections:
+            if zone is not None and _is_zone_section(section, zone):
+                changed = True
+                continue
+            cards = []
+            for card in section.get("cards", []):
+                if not isinstance(card, dict):
+                    cards.append(card)
+                    continue
+                if card.get("entity") in entity_ids:
+                    changed = True
+                    continue
+                if card.get("type") == "statistics-graph":
+                    ents = [
+                        e
+                        for e in card.get("entities", [])
+                        if (e if isinstance(e, str) else e.get("entity")) not in entity_ids
+                    ]
+                    if len(ents) != len(card.get("entities", [])):
+                        changed = True
+                        if not ents:
+                            continue
+                        card = {**card, "entities": ents}
+                cards.append(card)
+            if cards or not section.get("cards"):
+                kept_sections.append({**section, "cards": cards})
+            else:
+                changed = True
+        view["sections"] = kept_sections
+    return changed
+
+
+async def async_remove_from_dashboard(
+    hass: HomeAssistant, zone: str | None, entity_ids: list[str]
+) -> None:
+    """Remove a zone's section and the given entities from the dashboard."""
+    dashboards = _dashboards(hass)
+    dashboard = dashboards.get(DASHBOARD_URL_PATH) if dashboards else None
+    if dashboard is None or getattr(dashboard, "mode", None) != "storage":
+        return
+    try:
+        config = copy.deepcopy(await dashboard.async_load(False))
+    except Exception:  # noqa: BLE001 - ConfigNotFound
+        return
+    if not isinstance(config, dict) or not isinstance(config.get("views"), list):
+        return
+    if _strip(config["views"], zone, set(entity_ids)):
+        await dashboard.async_save(config)
+        _LOGGER.info("Removed zone %s from dashboard", zone)
+
+
+async def async_delete_dashboard(hass: HomeAssistant) -> None:
+    """Delete our dashboard (config included)."""
+    if not dashboard_exists(hass):
+        return
+    coll = find_storage_collection(hass, "lovelace/dashboards", "lovelace_dashboards")
+    for item_id, item in list(coll.data.items()):
+        if item.get("url_path") == DASHBOARD_URL_PATH:
+            await coll.async_delete_item(item_id)
+            _LOGGER.info("Deleted dashboard /%s", DASHBOARD_URL_PATH)

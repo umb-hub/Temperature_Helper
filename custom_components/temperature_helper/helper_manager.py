@@ -113,3 +113,11 @@ async def async_create_helper(hass: HomeAssistant, spec: HelperSpec) -> str:
     item_id: str = item["id"]
     _LOGGER.info("Created helper %s.%s", spec.domain, item_id)
     return item_id
+
+
+async def async_delete_helper(hass: HomeAssistant, domain: str, item_id: str) -> None:
+    """Delete a UI-managed helper (no-op if it is already gone)."""
+    storage = get_storage_collection(hass, domain)
+    if item_id in storage.data:
+        await storage.async_delete_item(item_id)
+        _LOGGER.info("Deleted helper %s.%s", domain, item_id)

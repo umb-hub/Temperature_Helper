@@ -1,57 +1,69 @@
 {
   "config": {
-    "step": {
-      "user": {
-        "title": "Temperature Helper",
-        "description": "Crea helper nativi di Home Assistant (visibili in Impostazioni → Dispositivi e servizi → Helper) per una zona di riscaldamento. Gli helper restano anche se l'integrazione viene rimossa.",
-        "data": {
-          "zone": "Nome zona",
-          "setpoints": "Setpoint da creare (input_number)",
-          "min_temp": "Temperatura minima",
-          "max_temp": "Temperatura massima",
-          "step": "Passo",
-          "manual_switch": "Crea interruttore 'Modalità Manuale' (input_boolean)",
-          "dashboard": "Aggiungi gli helper alla dashboard 'Temperature'",
-          "temperature_sensor": "Sensore temperatura della zona (facoltativo)"
-        },
-        "data_description": {
-          "temperature_sensor": "Aggiunto all'helper condiviso 'Temperatura media', mostrato nel grafico della dashboard"
-        }
-      }
-    },
-    "error": {
-      "min_max": "La minima deve essere inferiore alla massima.",
-      "nothing_selected": "Seleziona almeno un helper da creare.",
-      "zone_required": "Inserisci il nome della zona."
-    },
     "abort": {
-      "already_configured": "Questa zona è già configurata."
+      "single_instance_allowed": "Temperature Helper è già installato. Aggiungi le zone dalla sua pagina."
+    }
+  },
+  "config_subentries": {
+    "zone": {
+      "entry_type": "Zona",
+      "initiate_flow": {
+        "user": "Aggiungi zona"
+      },
+      "step": {
+        "user": {
+          "title": "Nuova zona",
+          "description": "Crea helper nativi per questa zona di riscaldamento. Eliminando la zona vengono eliminati.",
+          "data": {
+            "zone": "Nome zona",
+            "setpoints": "Setpoint da creare (input_number)",
+            "min_temp": "Temperatura minima",
+            "max_temp": "Temperatura massima",
+            "step": "Passo",
+            "manual_switch": "Crea interruttore 'Modalità Manuale' (input_boolean)",
+            "temperature_sensor": "Sensore temperatura della zona (facoltativo)"
+          },
+          "data_description": {
+            "temperature_sensor": "Aggiunto all'helper media condiviso, mostrato nel grafico della dashboard"
+          }
+        },
+        "reconfigure": {
+          "title": "Zona {zone}",
+          "description": "I nuovi setpoint vengono creati; quelli deselezionati vengono eliminati.",
+          "data": {
+            "setpoints": "Setpoint da creare (input_number)",
+            "min_temp": "Temperatura minima",
+            "max_temp": "Temperatura massima",
+            "step": "Passo",
+            "manual_switch": "Crea interruttore 'Modalità Manuale' (input_boolean)",
+            "temperature_sensor": "Sensore temperatura della zona (facoltativo)"
+          },
+          "data_description": {
+            "temperature_sensor": "Aggiunto all'helper media condiviso, mostrato nel grafico della dashboard"
+          }
+        }
+      },
+      "error": {
+        "min_max": "La minima deve essere inferiore alla massima.",
+        "nothing_selected": "Seleziona almeno un helper da creare.",
+        "zone_required": "Inserisci il nome della zona."
+      },
+      "abort": {
+        "already_configured": "Questa zona esiste già.",
+        "reconfigure_successful": "Zona aggiornata."
+      }
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Temperature Helper",
-        "description": "Gli helper appena selezionati vengono creati al salvataggio. Quelli esistenti non vengono modificati né eliminati: modificali dalla pagina Helper.",
+        "description": "Rimuovendo l'integrazione vengono eliminati tutti gli helper e la dashboard che ha creato.",
         "data": {
-          "setpoints": "Setpoint da creare (input_number)",
-          "min_temp": "Temperatura minima",
-          "max_temp": "Temperatura massima",
-          "step": "Passo",
-          "manual_switch": "Crea interruttore 'Modalità Manuale' (input_boolean)",
-          "recreate_missing": "Ricrea helper e card della dashboard che ho eliminato",
           "dashboard": "Aggiungi gli helper alla dashboard 'Temperature'",
-          "temperature_sensor": "Sensore temperatura della zona (facoltativo)"
-        },
-        "data_description": {
-          "temperature_sensor": "Aggiunto all'helper condiviso 'Temperatura media', mostrato nel grafico della dashboard"
+          "recreate_missing": "Ricrea helper e card della dashboard che ho eliminato"
         }
       }
-    },
-    "error": {
-      "min_max": "La minima deve essere inferiore alla massima.",
-      "nothing_selected": "Seleziona almeno un helper da creare.",
-      "zone_required": "Inserisci il nome della zona."
     }
   },
   "selector": {
