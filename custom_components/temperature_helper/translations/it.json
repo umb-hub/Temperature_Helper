@@ -10,7 +10,8 @@
           "min_temp": "Temperatura minima",
           "max_temp": "Temperatura massima",
           "step": "Passo",
-          "manual_switch": "Crea interruttore 'Modalità Manuale' (input_boolean)"
+          "manual_switch": "Crea interruttore 'Modalità Manuale' (input_boolean)",
+          "dashboard": "Aggiungi gli helper alla dashboard 'Temperature'"
         }
       }
     },
@@ -34,7 +35,8 @@
           "max_temp": "Temperatura massima",
           "step": "Passo",
           "manual_switch": "Crea interruttore 'Modalità Manuale' (input_boolean)",
-          "recreate_missing": "Ricrea gli helper che ho eliminato"
+          "recreate_missing": "Ricrea helper e card della dashboard che ho eliminato",
+          "dashboard": "Aggiungi gli helper alla dashboard 'Temperature'"
         }
       }
     },

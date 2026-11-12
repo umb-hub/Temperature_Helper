@@ -20,6 +20,7 @@ from homeassistant.helpers import selector
 from homeassistant.util import slugify
 
 from .const import (
+    CONF_DASHBOARD,
     CONF_MANUAL_SWITCH,
     CONF_MAX_TEMP,
     CONF_MIN_TEMP,
@@ -74,6 +75,9 @@ def _settings_schema(defaults: dict[str, Any]) -> dict:
         ): STEP_SELECTOR,
         vol.Required(
             CONF_MANUAL_SWITCH, default=defaults.get(CONF_MANUAL_SWITCH, True)
+        ): selector.BooleanSelector(),
+        vol.Required(
+            CONF_DASHBOARD, default=defaults.get(CONF_DASHBOARD, True)
         ): selector.BooleanSelector(),
     }
 

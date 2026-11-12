@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 
 from .const import (
+    CONF_DASHBOARD,
     CONF_MANUAL_SWITCH,
     CONF_MAX_TEMP,
     CONF_MIN_TEMP,
@@ -17,6 +18,7 @@ from .const import (
     CONF_SETPOINTS,
     CONF_STEP,
     CONF_ZONE,
+    DATA_DASHBOARD_PLACED,
     DATA_HELPERS,
     INPUT_BOOLEAN,
     INPUT_NUMBER,
@@ -25,6 +27,7 @@ from .const import (
     MANUAL_SWITCH_LABEL,
     SETPOINT_TYPES,
 )
+from .dashboard_manager import async_add_zone_to_dashboard
 from .helper_manager import (
     HelperCollectionUnavailable,
     HelperSpec,
@@ -83,7 +86,9 @@ def build_specs(entry: ConfigEntry) -> list[HelperSpec]:
     return specs
 
 
-async def async_ensure_helpers(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def async_ensure_helpers(
+    hass: HomeAssistant, entry: ConfigEntry, recreate: bool
+) -> None:
     """Create missing helpers without ever duplicating them.
 
     Rules per helper:
@@ -94,7 +99,6 @@ async def async_ensure_helpers(hass: HomeAssistant, entry: ConfigEntry) -> None:
     * not tracked, does not exist         -> created and tracked
     """
     tracked: dict[str, dict[str, str]] = dict(entry.data.get(DATA_HELPERS, {}))
-    recreate = bool(entry.options.get(CONF_RECREATE_MISSING, False))
     changed = False
 
     for spec in build_specs(entry):
@@ -125,20 +129,57 @@ async def async_ensure_helpers(hass: HomeAssistant, entry: ConfigEntry) -> None:
             entry, data={**entry.data, DATA_HELPERS: tracked}
         )
 
+
+
+async def async_ensure_dashboard(
+    hass: HomeAssistant, entry: ConfigEntry, recreate: bool
+) -> None:
+    """Place helpers not yet placed in the dashboard (each one only once).
+
+    If the user later removes a card or the whole dashboard, it is not
+    re-added on restart; "recreate_missing" places everything again.
+    """
+    if not _option(entry, CONF_DASHBOARD, True):
+        return
+    tracked: dict[str, dict[str, str]] = entry.data.get(DATA_HELPERS, {})
+    placed = set() if recreate else set(entry.data.get(DATA_DASHBOARD_PLACED, []))
+    todo = {
+        key: h
+        for key, h in tracked.items()
+        if key not in placed and helper_exists(hass, h["domain"], h["id"])
+    }
+    if not todo:
+        return
+    try:
+        ok = await async_add_zone_to_dashboard(
+            hass, entry.data[CONF_ZONE], list(todo.values())
+        )
+    except Exception:  # noqa: BLE001 - never break helpers because of the UI
+        _LOGGER.exception("Unable to update the Temperature dashboard")
+        return
+    if ok:
+        hass.config_entries.async_update_entry(
+            entry,
+            data={**entry.data, DATA_DASHBOARD_PLACED: sorted(placed | set(todo))},
+        )
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up Temperature Helper from a config entry."""
+    recreate = bool(entry.options.get(CONF_RECREATE_MISSING, False))
+    try:
+        await async_ensure_helpers(hass, entry, recreate)
+    except HelperCollectionUnavailable as err:
+        raise ConfigEntryNotReady(str(err)) from err
+
+    await async_ensure_dashboard(hass, entry, recreate)
+
     if recreate:
         # One-shot flag: clear it so later restarts respect user deletions again.
         hass.config_entries.async_update_entry(
             entry,
             options={k: v for k, v in entry.options.items() if k != CONF_RECREATE_MISSING},
         )
-
-
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Temperature Helper from a config entry."""
-    try:
-        await async_ensure_helpers(hass, entry)
-    except HelperCollectionUnavailable as err:
-        raise ConfigEntryNotReady(str(err)) from err
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True

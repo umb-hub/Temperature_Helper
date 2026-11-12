@@ -106,3 +106,90 @@ async def test_user_deletion_respected_then_recreate(hass: HomeAssistant) -> Non
         "soggiorno_temperatura_notte",
     ]
     assert "recreate_missing" not in entry.options
+
+
+async def _setup_with_lovelace(hass: HomeAssistant):
+    assert await async_setup_component(hass, "lovelace", {})
+    return await _setup(hass)
+
+
+def _dashboard(hass):
+    return hass.data["lovelace"].dashboards.get("temperature-helper")
+
+
+async def test_dashboard_created(hass: HomeAssistant) -> None:
+    await _setup_with_lovelace(hass)
+    dash = _dashboard(hass)
+    assert dash is not None and dash.mode == "storage"
+    config = await dash.async_load(False)
+    sections = config["views"][0]["sections"]
+    assert len(sections) == 1
+    entities = [c.get("entity") for c in sections[0]["cards"]]
+    assert sections[0]["cards"][0]["heading"] == "Soggiorno"
+    assert set(entities[1:]) == {
+        "input_number.soggiorno_temperatura_comfort",
+        "input_number.soggiorno_temperatura_eco",
+        "input_boolean.soggiorno_modalita_manuale",
+    }
+
+
+async def test_dashboard_no_duplicates_and_second_zone(hass: HomeAssistant) -> None:
+    entry = await _setup_with_lovelace(hass)
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**USER_INPUT, "zone": "Camera"}
+    )
+    await hass.async_block_till_done()
+
+    config = await _dashboard(hass).async_load(False)
+    headings = [s["cards"][0]["heading"] for s in config["views"][0]["sections"]]
+    assert headings == ["Soggiorno", "Camera"]
+
+
+async def test_dashboard_new_setpoint_appended_to_zone(hass: HomeAssistant) -> None:
+    entry = await _setup_with_lovelace(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    opts = {k: v for k, v in USER_INPUT.items() if k != "zone"}
+    await hass.config_entries.options.async_configure(
+        result["flow_id"], {**opts, "setpoints": ["comfort", "eco", "night"], "dashboard": True, "recreate_missing": False}
+    )
+    await hass.async_block_till_done()
+    config = await _dashboard(hass).async_load(False)
+    sections = config["views"][0]["sections"]
+    assert len(sections) == 1
+    assert sections[0]["cards"][-1]["entity"] == "input_number.soggiorno_temperatura_notte"
+
+
+async def test_dashboard_user_edits_respected(hass: HomeAssistant) -> None:
+    entry = await _setup_with_lovelace(hass)
+    dash = _dashboard(hass)
+    await dash.async_save({"views": [{"title": "Mia", "cards": []}]})
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert await dash.async_load(False) == {"views": [{"title": "Mia", "cards": []}]}
+
+
+async def test_dashboard_kept_on_remove(hass: HomeAssistant) -> None:
+    entry = await _setup_with_lovelace(hass)
+    assert await hass.config_entries.async_remove(entry.entry_id)
+    await hass.async_block_till_done()
+    assert _dashboard(hass) is not None
+
+
+async def test_dashboard_disabled(hass: HomeAssistant) -> None:
+    assert await async_setup_component(hass, "lovelace", {})
+    assert await async_setup_component(hass, "input_number", {})
+    assert await async_setup_component(hass, "input_boolean", {})
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**USER_INPUT, "dashboard": False}
+    )
+    await hass.async_block_till_done()
+    assert _dashboard(hass) is None

@@ -46,12 +46,12 @@ class HelperSpec:
         return slugify(self.data["name"])
 
 
-def _from_websocket(hass: HomeAssistant, domain: str) -> collection.StorageCollection | None:
-    """Find the collection through the registered ``<domain>/create`` handler."""
+def _from_websocket(hass: HomeAssistant, ws_prefix: str) -> collection.StorageCollection | None:
+    """Find the collection through the registered ``<ws_prefix>/create`` handler."""
     handlers = hass.data.get(WEBSOCKET_DOMAIN)
     if not isinstance(handlers, dict):
         return None
-    registered = handlers.get(f"{domain}/create")
+    registered = handlers.get(f"{ws_prefix}/create")
     if not registered:
         return None
 
@@ -69,24 +69,31 @@ def _from_websocket(hass: HomeAssistant, domain: str) -> collection.StorageColle
     return None
 
 
-def _from_gc(domain: str) -> collection.StorageCollection | None:
-    """Fallback: scan live objects for the collection backed by ``.storage/<domain>``."""
+def _from_gc(store_key: str) -> collection.StorageCollection | None:
+    """Fallback: scan live objects for the collection backed by ``.storage/<store_key>``."""
     for obj in gc.get_objects():
         if isinstance(obj, collection.StorageCollection):
             store = getattr(obj, "store", None)
-            if getattr(store, "key", None) == domain:
+            if getattr(store, "key", None) == store_key:
                 return obj
     return None
 
 
-def get_storage_collection(hass: HomeAssistant, domain: str) -> collection.StorageCollection:
-    """Return the StorageCollection used by the UI for ``domain`` helpers."""
-    storage = _from_websocket(hass, domain) or _from_gc(domain)
+def find_storage_collection(
+    hass: HomeAssistant, ws_prefix: str, store_key: str
+) -> collection.StorageCollection:
+    """Return the StorageCollection the frontend uses via ``<ws_prefix>/*``."""
+    storage = _from_websocket(hass, ws_prefix) or _from_gc(store_key)
     if storage is None:
         raise HelperCollectionUnavailable(
-            f"Unable to locate storage collection for '{domain}'"
+            f"Unable to locate storage collection for '{ws_prefix}'"
         )
     return storage
+
+
+def get_storage_collection(hass: HomeAssistant, domain: str) -> collection.StorageCollection:
+    """Return the StorageCollection used by the UI for ``domain`` helpers."""
+    return find_storage_collection(hass, domain, domain)
 
 
 def helper_exists(hass: HomeAssistant, domain: str, item_id: str) -> bool:

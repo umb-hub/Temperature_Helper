@@ -1,13 +1,21 @@
 {
   "domain": "temperature_helper",
   "name": "Temperature Helper",
-  "codeowners": ["@umb-hub"],
+  "after_dependencies": [
+    "lovelace"
+  ],
+  "codeowners": [
+    "@umb-hub"
+  ],
   "config_flow": true,
-  "dependencies": ["input_number", "input_boolean"],
+  "dependencies": [
+    "input_number",
+    "input_boolean"
+  ],
   "documentation": "https://github.com/umb-hub/Temperature_Helper",
   "integration_type": "service",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/umb-hub/Temperature_Helper/issues",
   "requirements": [],
-  "version": "1.0.0"
+  "version": "1.1.0"
 }

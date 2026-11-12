@@ -22,6 +22,21 @@ Per ogni zona configurata (es. `Soggiorno`):
 
 Scegli quali setpoint creare, min/max e passo durante la configurazione.
 
+## Dashboard
+
+Se l'opzione **Aggiungi gli helper alla dashboard 'Temperature'** è attiva (default),
+l'integrazione crea una dashboard nativa **Temperature** (`/temperature-helper`, nella
+barra laterale) con una sezione per zona: titolo della zona + una tile per ogni helper
+(pulsanti −/+ per i setpoint, tocco per la modalità manuale).
+
+- È una normale dashboard: la modifichi da *Modifica dashboard* come vuoi.
+- Ogni helper viene aggiunto **una sola volta**: se togli una card o l'intera
+  dashboard, non riappare al riavvio. Usa *Ricrea helper e card della dashboard
+  che ho eliminato* nelle opzioni per rimetterle.
+- Nuovi setpoint aggiunti dalle opzioni vengono accodati alla sezione della zona
+  (riconosciuta dal titolo).
+- Rimuovendo l'integrazione la dashboard **resta**.
+
 ## Installazione (HACS)
 
 1. HACS → menu ⋮ → **Repository personalizzati**

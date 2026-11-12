@@ -14,9 +14,12 @@ CONF_MAX_TEMP: Final = "max_temp"
 CONF_STEP: Final = "step"
 CONF_MANUAL_SWITCH: Final = "manual_switch"
 CONF_RECREATE_MISSING: Final = "recreate_missing"
+CONF_DASHBOARD: Final = "dashboard"
 
 # Stored in entry.data: helper key -> {"domain": ..., "id": ...}
 DATA_HELPERS: Final = "helpers"
+# Helper keys already placed in the dashboard (never re-added if user removes them)
+DATA_DASHBOARD_PLACED: Final = "dashboard_placed"
 
 INPUT_NUMBER: Final = "input_number"
 INPUT_BOOLEAN: Final = "input_boolean"
@@ -52,3 +55,8 @@ DEFAULT_SETPOINTS: Final = ["comfort", "eco", "night"]
 MANUAL_SWITCH_KEY: Final = "manual"
 MANUAL_SWITCH_LABEL: Final = "Modalità Manuale"
 MANUAL_SWITCH_ICON: Final = "mdi:hand-back-right"
+
+DASHBOARD_URL_PATH: Final = "temperature-helper"
+DASHBOARD_VIEW_PATH: Final = "temperature"
+DASHBOARD_TITLE: Final = "Temperature"
+DASHBOARD_ICON: Final = "mdi:thermostat"
