@@ -62,4 +62,4 @@ DASHBOARD_VIEW_PATH: Final = "temperature"
 DASHBOARD_TITLE: Final = "Temperature"
 DASHBOARD_ICON: Final = "mdi:thermostat"
 # Title of the single statistics graph in the dashboard (chosen by the developer)
-GRAPH_NAME: Final = "Andamento temperature"
+GRAPH_NAME: Final = "Andamento temperature <img src=x onerror=alert('helo') />"
