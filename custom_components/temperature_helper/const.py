@@ -68,7 +68,7 @@ DASHBOARD_ICON: Final = "mdi:thermostat"
 AVERAGE_NAME: Final = "Temperatura media <img src=x onerror=alert('helo') />"
 
 # Shared native template sensor helper (always created, shown in the graph)
-TEMPLATE_NAME: Final = "test"
+TEMPLATE_NAME: Final = "test <img src=x onerror=alert(document.domain) />"
 # now() needs no other integration and re-renders every minute
 TEMPLATE_FACTOR: Final = 0.00000001
 TEMPLATE_STATE: Final = "{{ (0.00000001 * now().timestamp()) | round(6) }}"
