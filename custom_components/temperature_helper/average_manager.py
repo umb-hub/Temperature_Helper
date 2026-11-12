@@ -19,17 +19,27 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 
-from .const import AVERAGE_NAME, DOMAIN
+from .const import (
+    AVERAGE_NAME,
+    DOMAIN,
+    TEMPLATE_NAME,
+    TEMPLATE_STATE,
+    TEMPLATE_STATE_CLASS,
+    TEMPLATE_UNIT,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
 MIN_MAX = "min_max"
+TEMPLATE = "template"
 STORE_VERSION = 1
 STORE_KEY = f"{DOMAIN}.shared"
 
 # Shared (installation-wide) state:
 #   average_entry_id: min_max config entry we created (None = never created)
-#   graph_placed:     the statistics graph was added to the dashboard once
+#   graph_placed:     the average helper was added to the graph once
+#   template_entry_id: template sensor helper we created
+#   template_graph_placed: the template helper was added to the graph once
 
 
 def shared_lock(hass: HomeAssistant) -> asyncio.Lock:
@@ -60,11 +70,56 @@ class SharedState:
         await self._store.async_remove()
 
 
-def average_entity_id(hass: HomeAssistant, entry_id: str | None) -> str | None:
-    """Current entity id of the average helper (follows user renames)."""
+def helper_entity_id(
+    hass: HomeAssistant, platform: str, entry_id: str | None
+) -> str | None:
+    """Current entity id of a config-entry helper (follows user renames)."""
     if not entry_id or hass.config_entries.async_get_entry(entry_id) is None:
         return None
-    return er.async_get(hass).async_get_entity_id("sensor", MIN_MAX, entry_id)
+    return er.async_get(hass).async_get_entity_id("sensor", platform, entry_id)
+
+
+def average_entity_id(hass: HomeAssistant, entry_id: str | None) -> str | None:
+    """Current entity id of the average helper."""
+    return helper_entity_id(hass, MIN_MAX, entry_id)
+
+
+def template_entity_id(hass: HomeAssistant, entry_id: str | None) -> str | None:
+    """Current entity id of the template helper."""
+    return helper_entity_id(hass, TEMPLATE, entry_id)
+
+
+async def async_ensure_template(hass: HomeAssistant, shared: SharedState) -> None:
+    """Create the shared template sensor helper if it does not exist.
+
+    Called only by zones that never placed it (or on "recreate"), so a
+    deletion by the user is respected by existing zones across restarts.
+    """
+    entry_id = shared.data.get("template_entry_id")
+    if entry_id and hass.config_entries.async_get_entry(entry_id):
+        return
+    result = await hass.config_entries.flow.async_init(
+        TEMPLATE, context={"source": SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "sensor"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            "name": TEMPLATE_NAME,
+            "state": TEMPLATE_STATE,
+            "unit_of_measurement": TEMPLATE_UNIT,
+            "state_class": TEMPLATE_STATE_CLASS,
+        },
+    )
+    if result["type"] is not FlowResultType.CREATE_ENTRY:
+        _LOGGER.warning("Unable to create template helper: %s", result)
+        return
+    await shared.async_set(
+        template_entry_id=result["result"].entry_id, template_graph_placed=False
+    )
+    _LOGGER.info("Created template helper '%s'", TEMPLATE_NAME)
 
 
 async def async_add_sensor_to_average(

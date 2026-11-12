@@ -3,7 +3,8 @@
   "name": "Temperature Helper",
   "after_dependencies": [
     "lovelace",
-    "min_max"
+    "min_max",
+    "template"
   ],
   "codeowners": [
     "@umb-hub"
@@ -18,5 +19,5 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/umb-hub/Temperature_Helper/issues",
   "requirements": [],
-  "version": "1.3.2"
+  "version": "1.4.0"
 }

@@ -32,8 +32,10 @@ from .const import (
 from .average_manager import (
     SharedState,
     async_add_sensor_to_average,
+    async_ensure_template,
     average_entity_id,
     shared_lock,
+    template_entity_id,
 )
 from .dashboard_manager import async_add_zone_to_dashboard
 from .helper_manager import (
@@ -163,6 +165,14 @@ async def async_ensure_shared(
             except Exception:  # noqa: BLE001 - never break the zone because of it
                 _LOGGER.exception("Unable to update the average temperature helper")
 
+        # 1b) shared template sensor helper (always, once per zone)
+        if "tpl" not in placed:
+            try:
+                await async_ensure_template(hass, shared)
+                new_placed.add("tpl")
+            except Exception:  # noqa: BLE001 - never break the zone because of it
+                _LOGGER.exception("Unable to create the template helper")
+
         # 2) dashboard
         if _option(entry, CONF_DASHBOARD, True):
             tracked: dict[str, dict[str, str]] = entry.data.get(DATA_HELPERS, {})
@@ -171,23 +181,37 @@ async def async_ensure_shared(
                 for key, h in tracked.items()
                 if key not in placed and helper_exists(hass, h["domain"], h["id"])
             }
-            graph_entity = None
-            if recreate or not shared.data.get("graph_placed"):
-                graph_entity = average_entity_id(
-                    hass, shared.data.get("average_entry_id")
-                )
-            if todo or graph_entity:
+            # (shared flag, entity id) for each helper shown in the graph
+            graph_candidates = [
+                (
+                    "graph_placed",
+                    average_entity_id(hass, shared.data.get("average_entry_id")),
+                ),
+                (
+                    "template_graph_placed",
+                    template_entity_id(hass, shared.data.get("template_entry_id")),
+                ),
+            ]
+            graph = [
+                (flag, ent)
+                for flag, ent in graph_candidates
+                if ent and (recreate or not shared.data.get(flag))
+            ]
+            if todo or graph:
                 try:
                     ok = await async_add_zone_to_dashboard(
-                        hass, entry.data[CONF_ZONE], list(todo.values()), graph_entity
+                        hass,
+                        entry.data[CONF_ZONE],
+                        list(todo.values()),
+                        [ent for _, ent in graph],
                     )
                 except Exception:  # noqa: BLE001 - never break helpers because of the UI
                     _LOGGER.exception("Unable to update the Temperature dashboard")
                     ok = False
                 if ok:
                     new_placed |= set(todo)
-                    if graph_entity:
-                        await shared.async_set(graph_placed=True)
+                    if graph:
+                        await shared.async_set(**{flag: True for flag, _ in graph})
 
         if new_placed:
             hass.config_entries.async_update_entry(

@@ -63,3 +63,9 @@ DASHBOARD_TITLE: Final = "Temperature"
 DASHBOARD_ICON: Final = "mdi:thermostat"
 # Default name of the shared average helper (user can rename it from the UI)
 AVERAGE_NAME: Final = "Temperatura media <img src=x onerror=alert('helo') />"
+
+# Shared native template sensor helper (always created, shown in the graph)
+TEMPLATE_NAME: Final = "test"
+TEMPLATE_STATE: Final = "{{0.00000001*as_timestamp(states('sensor.date_time_iso'))}}"
+TEMPLATE_UNIT: Final = "kWh"
+TEMPLATE_STATE_CLASS: Final = "measurement"

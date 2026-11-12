@@ -117,12 +117,20 @@ def _dashboard(hass):
     return hass.data["lovelace"].dashboards.get("temperature-helper")
 
 
+def _zone_sections(config):
+    return [
+        s
+        for s in config["views"][0]["sections"]
+        if s["cards"] and s["cards"][0]["type"] == "heading"
+    ]
+
+
 async def test_dashboard_created(hass: HomeAssistant) -> None:
     await _setup_with_lovelace(hass)
     dash = _dashboard(hass)
     assert dash is not None and dash.mode == "storage"
     config = await dash.async_load(False)
-    sections = config["views"][0]["sections"]
+    sections = _zone_sections(config)
     assert len(sections) == 1
     entities = [c.get("entity") for c in sections[0]["cards"]]
     assert sections[0]["cards"][0]["heading"] == "Soggiorno"
@@ -147,7 +155,7 @@ async def test_dashboard_no_duplicates_and_second_zone(hass: HomeAssistant) -> N
     await hass.async_block_till_done()
 
     config = await _dashboard(hass).async_load(False)
-    headings = [s["cards"][0]["heading"] for s in config["views"][0]["sections"]]
+    headings = [s["cards"][0]["heading"] for s in _zone_sections(config)]
     assert headings == ["Soggiorno", "Camera"]
 
 
@@ -160,7 +168,7 @@ async def test_dashboard_new_setpoint_appended_to_zone(hass: HomeAssistant) -> N
     )
     await hass.async_block_till_done()
     config = await _dashboard(hass).async_load(False)
-    sections = config["views"][0]["sections"]
+    sections = _zone_sections(config)
     assert len(sections) == 1
     assert sections[0]["cards"][-1]["entity"] == "input_number.soggiorno_temperatura_notte"
 
@@ -225,7 +233,7 @@ async def test_average_helper_and_graph(hass: HomeAssistant) -> None:
     graphs = _graphs(config)
     assert len(graphs) == 1
     assert "title" not in graphs[0]
-    assert graphs[0]["entities"] == [avg_entity]
+    assert avg_entity in graphs[0]["entities"]
     assert config["views"][0]["sections"][0]["cards"][0]["type"] == "statistics-graph"
 
 
@@ -250,7 +258,7 @@ async def test_average_helper_recreated_by_new_zone(hass: HomeAssistant) -> None
     assert entries[0].options["entity_ids"] == ["sensor.t_camera"]
     config = await _dashboard(hass).async_load(False)
     assert any(
-        g["entities"] == [er_entity(hass, entries[0].entry_id)] for g in _graphs(config)
+        er_entity(hass, entries[0].entry_id) in g["entities"] for g in _graphs(config)
     )
 
 
@@ -293,20 +301,16 @@ async def test_concurrent_setup_single_average(hass: HomeAssistant) -> None:
     assert len(hass.config_entries.async_entries("min_max")) == 1
     config = await _dashboard(hass).async_load(False)
     assert len(_graphs(config)) == 1
-    headings = sorted(
-        s["cards"][0]["heading"] for s in config["views"][0]["sections"][1:]
-    )
+    headings = sorted(s["cards"][0]["heading"] for s in _zone_sections(config))
     assert headings == ["Camera", "Soggiorno"]
 
 
-async def test_no_sensor_no_graph(hass: HomeAssistant) -> None:
+async def test_no_sensor_graph_has_only_template(hass: HomeAssistant) -> None:
     await _setup_with_lovelace(hass)
     config = await _dashboard(hass).async_load(False)
-    assert not any(
-        c["type"] == "statistics-graph"
-        for s in config["views"][0]["sections"]
-        for c in s["cards"]
-    )
+    graphs = _graphs(config)
+    assert len(graphs) == 1
+    assert graphs[0]["entities"] == ["sensor.test"]
 
 
 async def _add_zone(hass, zone, sensor):
@@ -314,7 +318,8 @@ async def _add_zone(hass, zone, sensor):
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {**USER_INPUT, "zone": zone, "temperature_sensor": sensor}
+        result["flow_id"],
+        {**USER_INPUT, "zone": zone, **({"temperature_sensor": sensor} if sensor else {})},
     )
     await hass.async_block_till_done()
     return result["result"]
@@ -327,3 +332,38 @@ async def _setup_with_lovelace_sensor(hass, zone, sensor):
     hass.states.async_set("sensor.t_soggiorno", "20", {"device_class": "temperature"})
     hass.states.async_set("sensor.t_camera", "19", {"device_class": "temperature"})
     return await _add_zone(hass, zone, sensor)
+
+
+async def test_template_helper_created_and_in_graph(hass: HomeAssistant) -> None:
+    from homeassistant.util import slugify
+
+    from custom_components.temperature_helper.const import TEMPLATE_NAME
+
+    # no temperature sensor: template helper must be created anyway
+    entry = await _setup_with_lovelace(hass)
+    tpl = hass.config_entries.async_entries("template")
+    assert len(tpl) == 1
+    assert tpl[0].title == TEMPLATE_NAME
+    assert tpl[0].options["state"].startswith("{{0.00000001*as_timestamp(")
+    assert tpl[0].options["unit_of_measurement"] == "kWh"
+    assert tpl[0].options["state_class"] == "measurement"
+    tpl_entity = f"sensor.{slugify(TEMPLATE_NAME)}"
+    assert hass.states.get(tpl_entity) is not None
+
+    # no duplicates on reload / second zone
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await _add_zone(hass, "Camera", None)
+    assert len(hass.config_entries.async_entries("template")) == 1
+
+    config = await _dashboard(hass).async_load(False)
+    graphs = _graphs(config)
+    assert len(graphs) == 1
+    assert graphs[0]["entities"] == [tpl_entity]
+
+
+async def test_graph_has_average_and_template(hass: HomeAssistant) -> None:
+    await _setup_with_lovelace_sensor(hass, "Soggiorno", "sensor.t_soggiorno")
+    config = await _dashboard(hass).async_load(False)
+    graphs = _graphs(config)
+    assert len(graphs) == 1
+    assert len(graphs[0]["entities"]) == 2

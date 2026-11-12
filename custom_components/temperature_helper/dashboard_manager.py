@@ -138,16 +138,23 @@ def _place_helpers(views: list[dict[str, Any]], zone: str, entity_ids: list[str]
 
 
 def _place_graph(views: list[dict[str, Any]], entity_id: str) -> bool:
-    """Add a statistics graph (no title) of ``entity_id`` at the top, once."""
+    """Put ``entity_id`` in the dashboard's statistics graph, once.
+
+    Appended to the first existing statistics graph, otherwise a new graph
+    without title is created at the top.
+    """
+    first_graph: dict[str, Any] | None = None
     for view in views:
         for section in view.get("sections") or []:
             for card in section.get("cards", []):
-                if (
-                    isinstance(card, dict)
-                    and card.get("type") == "statistics-graph"
-                    and entity_id in _referenced_entities(card)
-                ):
-                    return False
+                if isinstance(card, dict) and card.get("type") == "statistics-graph":
+                    if entity_id in _referenced_entities(card):
+                        return False
+                    if first_graph is None:
+                        first_graph = card
+    if first_graph is not None:
+        first_graph.setdefault("entities", []).append(entity_id)
+        return True
 
     graph = {
         "type": "statistics-graph",
@@ -168,15 +175,15 @@ async def async_add_zone_to_dashboard(
     hass: HomeAssistant,
     zone: str,
     helpers: list[dict[str, str]],
-    graph_entity: str | None = None,
+    graph_entities: list[str] | None = None,
 ) -> bool:
     """Ensure the dashboard exists and shows this zone's helpers (+ graph).
 
     Returns True when done (or nothing to do), False if Lovelace is unavailable.
     Never modifies or removes what the user has: helpers already referenced
     anywhere are skipped, the others are appended to the zone's section
-    (matched by its heading) or to a new section. ``graph_entity`` gets a
-    statistics graph without title at the top (legend = helper's name).
+    (matched by its heading) or to a new section. ``graph_entities`` go in
+    the statistics graph without title at the top (legend = helpers' names).
     """
     dashboards = _dashboards(hass)
     if dashboards is None:
@@ -226,8 +233,9 @@ async def async_add_zone_to_dashboard(
         _place_helpers(views, zone, missing)
         changed = True
 
-    if graph_entity and _place_graph(views, graph_entity):
-        changed = True
+    for graph_entity in graph_entities or []:
+        if _place_graph(views, graph_entity):
+            changed = True
 
     if changed:
         await dashboard.async_save(config)
