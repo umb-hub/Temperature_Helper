@@ -1,0 +1,58 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Temperature Helper",
+        "description": "Crea helper nativi di Home Assistant (visibili in Impostazioni → Dispositivi e servizi → Helper) per una zona di riscaldamento. Gli helper restano anche se l'integrazione viene rimossa.",
+        "data": {
+          "zone": "Nome zona",
+          "setpoints": "Setpoint da creare (input_number)",
+          "min_temp": "Temperatura minima",
+          "max_temp": "Temperatura massima",
+          "step": "Passo",
+          "manual_switch": "Crea interruttore 'Modalità Manuale' (input_boolean)"
+        }
+      }
+    },
+    "error": {
+      "min_max": "La minima deve essere inferiore alla massima.",
+      "nothing_selected": "Seleziona almeno un helper da creare.",
+      "zone_required": "Inserisci il nome della zona."
+    },
+    "abort": {
+      "already_configured": "Questa zona è già configurata."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Temperature Helper",
+        "description": "Gli helper appena selezionati vengono creati al salvataggio. Quelli esistenti non vengono modificati né eliminati: modificali dalla pagina Helper.",
+        "data": {
+          "setpoints": "Setpoint da creare (input_number)",
+          "min_temp": "Temperatura minima",
+          "max_temp": "Temperatura massima",
+          "step": "Passo",
+          "manual_switch": "Crea interruttore 'Modalità Manuale' (input_boolean)",
+          "recreate_missing": "Ricrea gli helper che ho eliminato"
+        }
+      }
+    },
+    "error": {
+      "min_max": "La minima deve essere inferiore alla massima.",
+      "nothing_selected": "Seleziona almeno un helper da creare.",
+      "zone_required": "Inserisci il nome della zona."
+    }
+  },
+  "selector": {
+    "setpoints": {
+      "options": {
+        "comfort": "Comfort",
+        "eco": "Eco",
+        "night": "Notte",
+        "away": "Assenza",
+        "frost": "Antigelo"
+      }
+    }
+  }
+}
