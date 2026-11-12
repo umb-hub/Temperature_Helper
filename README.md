@@ -24,7 +24,8 @@ Richiede Home Assistant 2025.3 o successivo.
 
 - Helper *Template → Sensore template* **test**: stato
   `{{ (0.00000001 * now().timestamp()) | round(6) }}`, unità `kWh`, classe di stato
-  *Misura* (si aggiorna ogni minuto).
+  *Misura* (si aggiorna ogni minuto). Alla creazione vengono importate le
+  statistiche orarie degli ultimi 7 giorni, così il grafico ha dati da subito.
 - Dashboard **Temperature** (`/temperature-helper`, nella barra laterale) con un
   grafico statistico senza titolo in cima: la legenda usa i nomi degli helper,
   quindi rinominandoli cambia anche il grafico.

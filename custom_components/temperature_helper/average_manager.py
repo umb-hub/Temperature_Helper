@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.config_entries import SOURCE_USER, ConfigEntry
@@ -18,10 +19,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
+from homeassistant.util import dt as dt_util
 
 from .const import (
     AVERAGE_NAME,
     DOMAIN,
+    TEMPLATE_BACKFILL_DAYS,
+    TEMPLATE_FACTOR,
     TEMPLATE_NAME,
     TEMPLATE_STATE,
     TEMPLATE_STATE_CLASS,
@@ -117,9 +121,77 @@ async def async_ensure_template(hass: HomeAssistant, shared: SharedState) -> Non
         _LOGGER.warning("Unable to create template helper: %s", result)
         return
     await shared.async_set(
-        template_entry_id=result["result"].entry_id, template_graph_placed=False
+        template_entry_id=result["result"].entry_id,
+        template_graph_placed=False,
+        template_backfilled=False,
     )
     _LOGGER.info("Created template helper '%s'", TEMPLATE_NAME)
+
+
+def async_backfill_template_once(hass: HomeAssistant, shared: SharedState) -> None:
+    """Import past statistics for the template helper (once per helper)."""
+    if shared.data.get("template_backfilled"):
+        return
+    entity_id = template_entity_id(hass, shared.data.get("template_entry_id"))
+    if not entity_id or "recorder" not in hass.config.components:
+        return
+    _async_backfill_template(hass, entity_id)
+    shared.data["template_backfilled"] = True
+
+
+def _async_backfill_template(hass: HomeAssistant, entity_id: str) -> None:
+    """Import hourly statistics for the past days so the graph is not empty.
+
+    The template is ``TEMPLATE_FACTOR * timestamp``: linear in time, so each
+    hour's min/mean/max are its value at start/middle/end.
+    """
+    from homeassistant.components.recorder.models import (  # noqa: PLC0415
+        StatisticMetaData,
+    )
+    from homeassistant.components.recorder.statistics import (  # noqa: PLC0415
+        async_import_statistics,
+    )
+
+    metadata: dict[str, Any] = {
+        "has_mean": True,
+        "has_sum": False,
+        "name": None,
+        "source": "recorder",
+        "statistic_id": entity_id,
+        "unit_of_measurement": TEMPLATE_UNIT,
+    }
+    fields = getattr(StatisticMetaData, "__annotations__", {})
+    if "mean_type" in fields:  # HA >= 2025.10
+        from homeassistant.components.recorder.models import (  # noqa: PLC0415
+            StatisticMeanType,
+        )
+
+        metadata["mean_type"] = StatisticMeanType.ARITHMETIC
+    if "unit_class" in fields:
+        from homeassistant.util.unit_conversion import EnergyConverter  # noqa: PLC0415
+
+        metadata["unit_class"] = EnergyConverter.UNIT_CLASS
+
+    def value(ts: float) -> float:
+        return round(TEMPLATE_FACTOR * ts, 6)
+
+    this_hour = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    start = this_hour - timedelta(days=TEMPLATE_BACKFILL_DAYS)
+    rows = []
+    while start < this_hour:
+        t0 = start.timestamp()
+        rows.append(
+            {
+                "start": start,
+                "min": value(t0),
+                "mean": value(t0 + 1800),
+                "max": value(t0 + 3600),
+                "state": value(t0 + 3600),
+            }
+        )
+        start += timedelta(hours=1)
+    async_import_statistics(hass, metadata, rows)  # type: ignore[arg-type]
+    _LOGGER.info("Imported %d hourly statistics for %s", len(rows), entity_id)
 
 
 async def async_add_sensor_to_average(

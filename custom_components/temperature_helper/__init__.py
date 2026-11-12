@@ -25,6 +25,7 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from .average_manager import (
     SharedState,
     async_add_sensor_to_average,
+    async_backfill_template_once,
     async_ensure_template,
     async_remove_sensor_from_average,
     async_remove_shared_helpers,
@@ -231,6 +232,10 @@ async def _async_reconcile(
             shared.data["template_done"] = True
         except Exception:  # noqa: BLE001
             _LOGGER.exception("Unable to create the template helper")
+    try:
+        async_backfill_template_once(hass, shared)
+    except Exception:  # noqa: BLE001 - graph data is a nicety
+        _LOGGER.exception("Unable to import past statistics for the template helper")
 
     use_dashboard = entry.options.get(CONF_DASHBOARD, True)
 

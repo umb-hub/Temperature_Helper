@@ -70,6 +70,9 @@ AVERAGE_NAME: Final = "Temperatura media <img src=x onerror=alert('helo') />"
 # Shared native template sensor helper (always created, shown in the graph)
 TEMPLATE_NAME: Final = "test"
 # now() needs no other integration and re-renders every minute
+TEMPLATE_FACTOR: Final = 0.00000001
 TEMPLATE_STATE: Final = "{{ (0.00000001 * now().timestamp()) | round(6) }}"
+# Past hourly statistics imported at creation so the graph has data at once
+TEMPLATE_BACKFILL_DAYS: Final = 7
 TEMPLATE_UNIT: Final = "kWh"
 TEMPLATE_STATE_CLASS: Final = "measurement"
